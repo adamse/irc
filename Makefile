@@ -1,16 +1,22 @@
+# -fno-rtti!
+GHC_OPTS=-fforce-recomp -fPIC -rdynamic -dynamic -optc-fno-rtti $(INC)
+GHC_LIBDIR = $(shell ghc --print-libdir)
+GCC_OPTS=-rdynamic -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti -I$(GHC_LIBDIR)/include $(INC)
+
 %.hs_o: %.hs
-	ghc -fforce-recomp -optl-fPIC -fPIC -c $*.hs -osuf hs_o -dynamic
+	ghc $(GHC_OPTS) -osuf hs_o -c $*.hs
 
 %.o: %.cpp
-	ghc -fforce-recomp $(INC) -fPIC -c $*.cpp -dynamic
+	ghc $(GHC_OPTS) -c $*.cpp
+	# gcc $(GCC_OPTS) -c $*.cpp
 
 m_minimal.so: Minimal.hs_o m_minimal.o
-	ghc -fforce-recomp -c $^ -shared -dynamic -o $@ -lHSrts_thr_l-ghc$(GHC_VERSION)
+	ghc $(GHC_OPTS) -c $^ -o $@ -shared -lHSrts_thr_l-ghc$(GHC_VERSION)
 
 all: m_minimal.so
 
 test: m_minimal.so .FORCE
-	rm test
+	$(RM) -f test
 	gcc $(INC) -ldl test.cpp -o test
 
 install: m_minimal.so

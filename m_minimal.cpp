@@ -1,4 +1,4 @@
-#include <inspircd.h>
+#include "inspircd.h"
 #include "HsFFI.h"
 #include "Minimal_stub.h"
 
@@ -6,7 +6,7 @@ class MinimalModule : public Module {
   HsStablePtr state;
 
   public:
-  MinimalModule() {
+  MinimalModule() : state(NULL) {
     int argc = 0;
     char * argv[] = {NULL};
     char ** argp = argv;
@@ -20,7 +20,8 @@ class MinimalModule : public Module {
   }
 
   Version GetVersion() {
-    return Version("my version!", VF_VENDOR);
+    char* version = (char*)hs_module_version();
+    return Version(version, VF_VENDOR);
   }
 };
 

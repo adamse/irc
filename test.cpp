@@ -6,7 +6,7 @@ typedef Module* (*init_fun_type)();
 
 int main(int argc, char **argv) {
 
-  void* object = dlopen("./m_minimal.so", RTLD_NOW);
+  void* object = dlopen("./m_minimal.so", RTLD_LAZY);
 
   if (object == NULL) {
     printf("failed to dlopen\n");

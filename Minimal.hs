@@ -14,13 +14,13 @@ foreign export ccall hs_module_version :: IO CString
 
 hs_module_init :: IO (StablePtr State)
 hs_module_init = do
-  putStrLn "Hello"
+  putStrLn "Hello from haskell!"
   newStablePtr State
 
 hs_module_cleanup :: StablePtr State -> IO CInt
-hs_module_cleanup state = do 
-  putStrLn "Cleanup!" 
-  freeStablePtr state 
+hs_module_cleanup state = do
+  putStrLn "Cleanup!"
+  freeStablePtr state
   pure 1
 
 hs_module_version :: IO CString
