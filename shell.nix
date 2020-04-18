@@ -1,19 +1,19 @@
 { pkgs ? import <nixpkgs> {}
-, ghc ? "ghc883" 
+, ghc ? "ghc883"
 , inspircdSrc ? "/home/adam/src/inspircd"
 , inspircdRun ? "/home/adam/src/inspircd/run"
 }:
 
 let
   ghcPkgs = pkgs.haskell.packages.${ghc};
-  ghcWithPackages = ghcPkgs.ghcWithPackages (p: with p; [ base ]);
+  ghcWithPackages = ghcPkgs.ghcWithPackages (p: with p; [ base async text containers ]);
   ghcVersion = ghcPkgs.ghc.version;
 in
 pkgs.mkShell {
   INC = "-I${inspircdSrc}/include";
   INSPIRCD_RUN_PATH = "${inspircdRun}";
   GHC_VERSION = ghcVersion;
-  buildInputs = [ 
+  buildInputs = [
     ghcWithPackages
     pkgs.gcc
   ];

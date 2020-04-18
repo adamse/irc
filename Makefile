@@ -1,19 +1,18 @@
-# -fno-rtti!
-GHC_OPTS=-fforce-recomp -fPIC -rdynamic -dynamic -optc-fno-rtti $(INC)
-GHC_LIBDIR = $(shell ghc --print-libdir)
-GCC_OPTS=-rdynamic -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti -I$(GHC_LIBDIR)/include $(INC)
+all: m_minimal.so
+
+GHC_OPTS=-fforce-recomp -fPIC -dynamic $(INC)
+CXX_OPTS=-optc-fno-rtti
+HS_OPTS=-osuf hs_o
+LINK_OPTS=-package text -package async -shared -lHSrts_thr_l-ghc$(GHC_VERSION)
 
 %.hs_o: %.hs
-	ghc $(GHC_OPTS) -osuf hs_o -c $*.hs
+	ghc $(GHC_OPTS) $(HS_OPTS) -c $*.hs
 
 %.o: %.cpp
-	ghc $(GHC_OPTS) -c $*.cpp
-	# gcc $(GCC_OPTS) -c $*.cpp
+	ghc $(GHC_OPTS) $(CXX_OPTS) -c $*.cpp
 
 m_minimal.so: Minimal.hs_o m_minimal.o
-	ghc $(GHC_OPTS) -c $^ -o $@ -shared -lHSrts_thr_l-ghc$(GHC_VERSION)
-
-all: m_minimal.so
+	ghc $(GHC_OPTS) $(LINK_OPTS) -c $^ -o $@
 
 test: m_minimal.so .FORCE
 	$(RM) -f test
