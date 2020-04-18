@@ -1,1 +1,6 @@
-*.hi\n*.hs_o\n*.o\n*.so
+*.hi
+*.hs_o
+*_stub.h
+*.o
+*.so
+/test
