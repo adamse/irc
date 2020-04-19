@@ -14,6 +14,7 @@ import Foreign.StablePtr (newStablePtr, freeStablePtr, deRefStablePtr, StablePtr
 import Data.IORef (readIORef, IORef, newIORef)
 import Control.Concurrent.Chan (readChan, writeChan, Chan, newChan)
 import Control.Concurrent.Async (Async, async)
+import qualified Control.Concurrent.Async as Async
 import Foreign.C.Types (CChar)
 import Foreign (allocaBytes, FunPtr, plusPtr, castPtr, Ptr)
 import Foreign.Storable (Storable(..))
@@ -39,6 +40,7 @@ instance Show TargetType where
     TTChannel -> "TTChannel"
     TTServer -> "TTServer"
 
+
 data Message = Message
   { target :: Text
   , targetType :: TargetType
@@ -46,6 +48,10 @@ data Message = Message
   , message :: Text
   }
   deriving (Show)
+
+
+type Logger = LogLevel -> Text -> IO ()
+
 
 data State = State
   { known_channels :: IORef (Set Text)
@@ -69,16 +75,17 @@ pattern LOG_SPARSE = LogLevel 40
 pattern LOG_NONE :: LogLevel
 pattern LOG_NONE = LogLevel 5
 
-type Logger = LogLevel -> Text -> IO ()
+
 type CLogger = LogLevel -> Ptr Text -> IO ()
 
 foreign import ccall "dynamic" mkLogger :: FunPtr CLogger -> CLogger
 
-foreign export ccall hs_module_init :: FunPtr CLogger -> IO (StablePtr State)
-foreign export ccall hs_module_cleanup :: StablePtr State -> IO ()
-foreign export ccall hs_module_version :: IO CString
 
-hs_module_init :: FunPtr CLogger -> IO (StablePtr State)
+type Init = FunPtr CLogger -> IO (StablePtr State)
+
+foreign export ccall hs_module_init :: Init
+
+hs_module_init :: Init
 hs_module_init logger' = do
   let logger = mkLogger logger'
   let ircd_logger lvl t = withCString t (logger lvl)
@@ -94,24 +101,39 @@ hs_module_init logger' = do
 
   newStablePtr State{..}
 
-hs_module_cleanup :: StablePtr State -> IO ()
+
+type Cleanup = StablePtr State -> IO ()
+
+foreign export ccall hs_module_cleanup :: Cleanup
+
+hs_module_cleanup :: Cleanup
 hs_module_cleanup state = do
+  State{ircd_message_worker} <- deRefStablePtr state
+  Async.cancel ircd_message_worker
   freeStablePtr state
   pure ()
 
-hs_module_version :: IO CString
-hs_module_version = newCString "This is a inspircd module implemented in GHC Haskell"
 
-foreign export ccall hs_module_OnUserPostMessage :: StablePtr State -> Ptr Text -> TargetType -> Ptr Text -> Ptr Text -> IO CInt
+type Version = IO CString
 
-hs_module_OnUserPostMessage :: StablePtr State -> Ptr Text -> TargetType -> Ptr Text -> Ptr Text -> IO CInt
+foreign export ccall hs_module_version :: Version
+
+hs_module_version :: Version
+hs_module_version = newCString "This is a inspircd module implemented in GHC Haskell" -- TODO: this leaks the string
+
+
+type OnUserPostMessage = StablePtr State -> Ptr Text -> TargetType -> Ptr Text -> Ptr Text -> IO ()
+
+foreign export ccall hs_module_OnUserPostMessage :: OnUserPostMessage
+
+hs_module_OnUserPostMessage :: OnUserPostMessage
 hs_module_OnUserPostMessage state pnick targetType ptarget pmessage = do
   State{ircd_message_queue} <- deRefStablePtr state
   target <- peekCString ptarget
   sender <- peekCString pnick
   message <- peekCString pmessage
   writeChan ircd_message_queue Message{..}
-  pure 1
+
 
 peekCString :: Ptr Text -> IO Text
 peekCString ptr = do
@@ -120,10 +142,11 @@ peekCString ptr = do
   Text.peekCStringLen (data_, fromIntegral len)
 
 withCString :: Text -> (Ptr Text -> IO a) -> IO a
-withCString t act = Text.withCStringLen t \(data_, len') -> do
-  let len :: CULong = fromIntegral len'
-  let sz = sizeOf len + sizeOf data_
-  allocaBytes sz \ptr -> do
+withCString t act = Text.withCStringLen t \(data_, len') ->
+  let
+    len :: CULong = fromIntegral len'
+    sz = sizeOf len + sizeOf data_
+  in allocaBytes sz \ptr -> do
     poke ptr len
     poke (ptr `plusPtr` sizeOf len) data_
     act (castPtr ptr)
